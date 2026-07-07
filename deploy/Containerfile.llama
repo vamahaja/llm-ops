@@ -1,0 +1,63 @@
+# ==============================================================================
+# Stage 1: Build Environment
+# ==============================================================================
+FROM docker.io/ubuntu:22.04 AS builder
+
+# Prevent tzdata and other interactive prompts during build
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install build dependencies (CMake, GCC, and Vulkan Dev headers)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+    libvulkan-dev \
+    vulkan-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Clone the llama.cpp repository
+# Note: You can replace 'master' with a specific release tag (e.g., -b b3400) for stability
+RUN git clone --depth 1 https://github.com/ggerganov/llama.cpp.git .
+
+# Configure and build the server specifically with Vulkan backend enabled
+WORKDIR /app/build
+RUN cmake .. \
+    -DGGML_VULKAN=1 \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DGGML_NATIVE=OFF
+RUN cmake --build . --config Release --target llama-server -j$(nproc)
+
+# ==============================================================================
+# Stage 2: Runtime Environment
+# ==============================================================================
+FROM docker.io/ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Vulkan runtime libraries and Mesa drivers
+# The mesa-vulkan-drivers package is strictly required to expose the host's
+# integrated or dedicated AMD/Intel GPU to the container runtime.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libvulkan1 \
+    mesa-vulkan-drivers \
+    vulkan-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user for security
+RUN useradd -m -s /bin/bash llamauser
+USER llamauser
+
+# Set up the working directory and a dedicated volume mount point
+WORKDIR /app
+RUN mkdir -p /app/models
+
+# Copy only the compiled server binary from the builder stage
+COPY --from=builder /app/build/bin/llama-server /usr/local/bin/llama-server
+
+# Expose the default server port
+EXPOSE 8080
+
+# The entrypoint allows you to pass flags exactly like the native binary
+ENTRYPOINT ["llama-server"]
