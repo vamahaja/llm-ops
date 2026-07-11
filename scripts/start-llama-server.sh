@@ -85,15 +85,17 @@ podman run -d \
   --cpus="$CONTAINER_CPUS" \
   --memory="$CONTAINER_MEM" \
   --device /dev/dri \
-  --shm-size="2g" \
+  --security-opt label=disable \
+  --group-add keep-groups \
+  --shm-size="4g" \
   --restart unless-stopped \
   -p 8080:8080 \
-  -v "${MODEL_DIR}:/models:ro" \
-  --userns=host \
+  -v "${MODEL_DIR}:/models:ro,z" \
   ghcr.io/ggml-org/llama.cpp:server-vulkan \
   -m "/models/${MODEL_NAME}" \
   -c "$CONTEXT_WINDOW" \
   -np 1 \
+  --n-gpu-layers 99 \
   --host 0.0.0.0
 
 # --- Post-Start Verification ---
