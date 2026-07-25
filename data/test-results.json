@@ -1,0 +1,37 @@
+[
+    {
+        "Test Suite Name": "Authentication",
+        "Pass": 45,
+        "Fails": 2,
+        "Totals": 47,
+        "Failure reasons": "Timeout on 2FA endpoint"
+    },
+    {
+        "Test Suite Name": "Payment Gateway",
+        "Pass": 110,
+        "Fails": 5,
+        "Totals": 115,
+        "Failure reasons": "Stripe API rate limit"
+    },
+    {
+        "Test Suite Name": "User Profile",
+        "Pass": 30,
+        "Fails": 0,
+        "Totals": 30,
+        "Failure reasons": "N/A"
+    },
+    {
+        "Test Suite Name": "Search Engine",
+        "Pass": 85,
+        "Fails": 12,
+        "Totals": 97,
+        "Failure reasons": "ES cluster OOM, slow query response"
+    },
+    {
+        "Test Suite Name": "Data Export",
+        "Pass": 20,
+        "Fails": 3,
+        "Totals": 23,
+        "Failure reasons": "CSV error on special characters"
+    }
+]
