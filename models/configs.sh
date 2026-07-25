@@ -26,28 +26,17 @@ MODEL_CONFIGS=(
 # Model Repository Mapping
 declare -A MODEL_MAP
 MODEL_MAP=(
-  ["DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf"]=\
-    "bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF"
-  ["google_gemma-4-E2B-it-Q4_K_M.gguf"]=\
-    "bartowski/google_gemma-4-E2B-it-GGUF"
-  ["google_gemma-4-E4B-it-Q4_K_M.gguf"]=\
-    "bartowski/google_gemma-4-E4B-it-GGUF"
-  ["granite-3.1-3b-a800m-instruct.Q4_K_M.gguf"]=\
-    "QuantFactory/granite-3.1-3b-a800m-instruct-GGUF"
-  ["Llama-3.2-1B-Instruct-Q4_K_M.gguf"]=\
-    "bartowski/Llama-3.2-1B-Instruct-GGUF"
-  ["Llama-3.2-3B-Instruct-Q4_K_M.gguf"]=\
-    "bartowski/Llama-3.2-3B-Instruct-GGUF"
-  ["Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"]=\
-    "unsloth/Ministral-3-3B-Instruct-2512-GGUF"
-  ["Ministral-3-3B-Reasoning-2512-Q4_K_M.gguf"]=\
-    "unsloth/Ministral-3-3B-Reasoning-2512-GGUF"
-  ["Phi-3.5-mini-instruct.Q4_K_M.gguf"]=\
-    "bartowski/Phi-3.5-mini-instruct-GGUF"
-  ["qwen2.5-1.5b-instruct-q4_k_m.gguf"]=\
-    "Qwen/Qwen2.5-1.5B-Instruct-GGUF"
-  ["Qwen2.5-Coder-3B-Instruct-Q4_K_M.gguf"]=\
-    "Qwen/Qwen2.5-Coder-3B-Instruct-GGUF"
+  ["DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf"]="bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF"
+  ["google_gemma-4-E2B-it-Q4_K_M.gguf"]="bartowski/google_gemma-4-E2B-it-GGUF"
+  ["google_gemma-4-E4B-it-Q4_K_M.gguf"]="bartowski/google_gemma-4-E4B-it-GGUF"
+  ["granite-3.1-3b-a800m-instruct.Q4_K_M.gguf"]="QuantFactory/granite-3.1-3b-a800m-instruct-GGUF"
+  ["Llama-3.2-1B-Instruct-Q4_K_M.gguf"]="bartowski/Llama-3.2-1B-Instruct-GGUF"
+  ["Llama-3.2-3B-Instruct-Q4_K_M.gguf"]="bartowski/Llama-3.2-3B-Instruct-GGUF"
+  ["Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"]="unsloth/Ministral-3-3B-Instruct-2512-GGUF"
+  ["Ministral-3-3B-Reasoning-2512-Q4_K_M.gguf"]="unsloth/Ministral-3-3B-Reasoning-2512-GGUF"
+  ["Phi-3.5-mini-instruct.Q4_K_M.gguf"]="bartowski/Phi-3.5-mini-instruct-GGUF"
+  ["qwen2.5-1.5b-instruct-q4_k_m.gguf"]="Qwen/Qwen2.5-1.5B-Instruct-GGUF"
+  ["Qwen2.5-Coder-3B-Instruct-Q4_K_M.gguf"]="Qwen/Qwen2.5-Coder-3B-Instruct-GGUF"
   ["Qwen3.5-4B-Q4_K_M.gguf"]="TirGun/Qwen3.5-4B-GGUF"
   ["SmolLM3-Q4_K_M.gguf"]="bartowski/SmolLM3-GGUF"
 )
