@@ -1,39 +1,24 @@
 #!/bin/bash
 
-# ==============================================================================
-# Podman run script for llama.cpp server on AMD Ryzen 5700U
-# Supports user-provided model path and name
-# ==============================================================================
-
 set -eax
 
-# Default Configuration
-CONTAINER_PREFIX="llama-server"
+# Define script directory
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 
-# Set model Configurations (Calculated for 16384 Context Window)
-declare -A MODEL_CONFIGS
-MODEL_CONFIGS=(
-  # Group 1: Max Context (64k)
-  ["llama-3.2-1b-instruct"]="4 5.5g 65536"
-  ["deepseek-r1-distill-qwen-1.5b"]="4 5.5g 65536"
-  ["qwen2.5-1.5b-instruct"]="4 5.5g 65536"
+# Load environment configuration
+if [ -f "$SCRIPT_DIR/../.env" ]; then
+    source "$SCRIPT_DIR/../.env"
+fi
 
-  # Group 2: Balanced Code (32k)
-  ["llama-3.2-3b-instruct"]="4 5.5g 32768"
-  ["qwen2.5-coder-3b-instruct"]="4 5.5g 32768"
-  ["ministral-3-3b-instruct-2512"]="4 5.5g 32768"
-  ["ministral-3-3b-reasoning-2512"]="4 5.5g 32768"
-  ["granite-3.1-3b-a800m-instruct"]="4 5.5g 32768"
+# Set defaults if not defined
+CONTAINER_PREFIX="${CONTAINER_PREFIX:-llama-server}"
+PARALLEL_REQUESTS="${PARALLEL_REQUESTS:-1}"
+SHARED_MEMORY="${SHARED_MEMORY:-4g}"
+IP_ADDRESS="${IP_ADDRESS:-0.0.0.0}"
+GPU_LAYERS="${GPU_LAYERS:--1}"
 
-  # Group 3: Memory Heavy (16k)
-  ["phi-3.5-mini-instruct"]="4 5.0g 16384"
-  ["qwen3.5-4b"]="4 5.0g 16384"
-
-  # Group 4: Hard-Capped Native Limits (8k)
-  ["google_gemma-4-e2b-it"]="4 3.5g 8192"
-  ["google_gemma-4-e4b-it"]="4 4.5g 8192"
-  ["smollm3"]="4 3.5g 8192"
-)
+# Load model configurations
+source "$SCRIPT_DIR/../models/configs.sh"
 
 # --- Argument Parsing ---
 if [ $# -lt 1 ]; then
@@ -54,10 +39,11 @@ if [ ! -f "${MODEL_PATH}" ]; then
 fi
 
 # --- Get container configuration key ---
-CONFIG_KEY="${MODEL_NAME,,}"             # Convert to lowercase
-CONFIG_KEY="${CONFIG_KEY%-q4_k_m.gguf}"  # Strip dash variant
-CONFIG_KEY="${CONFIG_KEY%.q4_k_m.gguf}"  # Strip dot variant (Granite/Phi)
+CONFIG_KEY="${MODEL_NAME,,}"
+CONFIG_KEY="${CONFIG_KEY%-q4_k_m.gguf}"
+CONFIG_KEY="${CONFIG_KEY%.q4_k_m.gguf}"
 
+# Check if config exists in dictionary
 if [[ ! -v MODEL_CONFIGS["$CONFIG_KEY"] ]]; then
   echo "Error: Configuration for '$CONFIG_KEY' not found in dictionary."
   exit 1
@@ -65,7 +51,8 @@ fi
 
 # --- Set container configs ---
 CONTAINER_NAME="$CONTAINER_PREFIX-$CONFIG_KEY"
-read -r CONTAINER_CPUS CONTAINER_MEM CONTEXT_WINDOW <<< "${MODEL_CONFIGS[$CONFIG_KEY]}"
+read -r CONTAINER_CPUS CONTAINER_MEM CONTEXT_WINDOW <<< \
+  "${MODEL_CONFIGS[$CONFIG_KEY]}"
 
 # Check if port 8080 is already in use by another process
 if lsof -i :8080 > /dev/null 2>&1; then
@@ -78,7 +65,8 @@ podman stop "$CONTAINER_NAME" 2>/dev/null || true
 podman rm "$CONTAINER_NAME" 2>/dev/null || true
 
 # --- Run Container ---
-echo "Starting llama.cpp server with $CONTAINER_CPUS Performance Cores and $CONTAINER_MEM RAM limit..."
+echo "Starting llama.cpp server with $CONTAINER_CPUS Performance Cores and \
+$CONTAINER_MEM RAM limit..."
 
 podman run -d \
   --name "$CONTAINER_NAME" \
@@ -87,28 +75,51 @@ podman run -d \
   --device /dev/dri \
   --security-opt label=disable \
   --group-add keep-groups \
-  --shm-size="4g" \
+  --shm-size="$SHARED_MEMORY" \
   --restart unless-stopped \
   -p 8080:8080 \
   -v "${MODEL_DIR}:/models:ro,z" \
   ghcr.io/ggml-org/llama.cpp:server-vulkan \
   -m "/models/${MODEL_NAME}" \
   -c "$CONTEXT_WINDOW" \
-  -np 1 \
-  --n-gpu-layers 99 \
-  --host 0.0.0.0
+  -np "$PARALLEL_REQUESTS" \
+  --n-gpu-layers "$GPU_LAYERS" \
+  --host "$IP_ADDRESS"
 
 # --- Post-Start Verification ---
 echo "Waiting for server to initialize..."
-sleep 3
 
-# Check if container is running using exact name match
-if podman ps -q -f name="^${CONTAINER_NAME}$" > /dev/null 2>&1; then
-    echo "✅ Server started successfully."
-    echo "🌐 Available at: http://0.0.0.0:8080"
-    echo "📝 View live logs anytime with: podman logs -f $CONTAINER_NAME"
+# Poll health endpoint until it returns a successful status
+TIMEOUT=600
+INTERVAL=10
+ELAPSED=0
+SUCCESS=false
+
+echo "Checking health on http://$IP_ADDRESS:8080/health..."
+
+while [ $ELAPSED -lt $TIMEOUT ]; do
+    # Check if container is still running
+    if ! podman ps -q -f name="^${CONTAINER_NAME}$" > /dev/null 2>&1; then
+        echo "❌ Container is no longer running."
+        break
+    fi
+
+    if curl -s -f "http://$IP_ADDRESS:8080/health" > /dev/null 2>&1; then
+        SUCCESS=true
+        break
+    fi
+
+    sleep $INTERVAL
+    ELAPSED=$((ELAPSED + INTERVAL))
+    echo "Still waiting... ($ELAPSED/${TIMEOUT}s)"
+done
+
+if [ "$SUCCESS" = true ]; then
+    echo "✅ Server started successfully and is healthy."
+    echo "🌐 Available at: http://$IP_ADDRESS:8080"
+    echo "📝 View logs: podman logs -f $CONTAINER_NAME"
 else
-    echo "❌ Server failed to start."
+    echo "❌ Server failed to start or respond to health checks."
     echo "🔍 Check logs with: podman logs $CONTAINER_NAME"
     exit 1
 fi
