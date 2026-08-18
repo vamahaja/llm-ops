@@ -6,8 +6,8 @@ set -eax
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 
 # Load environment configuration
-if [ -f "$SCRIPT_DIR/../.env" ]; then
-    source "$SCRIPT_DIR/../.env"
+if [ -f "$SCRIPT_DIR/../../.env" ]; then
+    source "$SCRIPT_DIR/../../.env"
 fi
 
 # Set defaults if not defined
@@ -17,8 +17,13 @@ SHARED_MEMORY="${SHARED_MEMORY:-4g}"
 IP_ADDRESS="${IP_ADDRESS:-0.0.0.0}"
 GPU_LAYERS="${GPU_LAYERS:--1}"
 
-# Load model configurations
-source "$SCRIPT_DIR/../models/configs.sh"
+CONFIG_FILE="$SCRIPT_DIR/../../models/configs.yaml"
+
+if ! command -v yq &> /dev/null; then
+    echo "ERROR: The 'yq' utility is not installed or not in your PATH."
+    echo "Install it with: pip install yq"
+    exit 1
+fi
 
 # --- Argument Parsing ---
 if [ $# -lt 1 ]; then
@@ -43,16 +48,17 @@ CONFIG_KEY="${MODEL_NAME,,}"
 CONFIG_KEY="${CONFIG_KEY%-q4_k_m.gguf}"
 CONFIG_KEY="${CONFIG_KEY%.q4_k_m.gguf}"
 
-# Check if config exists in dictionary
-if [[ ! -v MODEL_CONFIGS["$CONFIG_KEY"] ]]; then
-  echo "Error: Configuration for '$CONFIG_KEY' not found in dictionary."
+# Check if config exists
+if [ "$(yq -r --arg k "$CONFIG_KEY" '.models | has($k)' "$CONFIG_FILE")" != "true" ]; then
+  echo "Error: Configuration for '$CONFIG_KEY' not found."
   exit 1
 fi
 
 # --- Set container configs ---
 CONTAINER_NAME="$CONTAINER_PREFIX-$CONFIG_KEY"
-read -r CONTAINER_CPUS CONTAINER_MEM CONTEXT_WINDOW <<< \
-  "${MODEL_CONFIGS[$CONFIG_KEY]}"
+CONTAINER_CPUS=$(yq -r --arg k "$CONFIG_KEY" '.models[$k].cpus' "$CONFIG_FILE")
+CONTAINER_MEM=$(yq -r --arg k "$CONFIG_KEY" '.models[$k].memory' "$CONFIG_FILE")
+CONTEXT_WINDOW=$(yq -r --arg k "$CONFIG_KEY" '.models[$k].context_window' "$CONFIG_FILE")
 
 # Check if port 8080 is already in use by another process
 if lsof -i :8080 > /dev/null 2>&1; then

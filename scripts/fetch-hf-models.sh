@@ -20,12 +20,18 @@ curl -LsSf https://hf.co/cli/install.sh | bash"
     exit 1
 fi
 
+if ! command -v yq &> /dev/null; then
+    echo "ERROR: The 'yq' utility is not installed or not in your PATH."
+    echo "Install it with: pip install yq"
+    exit 1
+fi
+
 # Ensure target directory exists
 mkdir -p "$TARGET_DIR"
 
-# Load model configurations and repository mapping
+# Load model configurations from YAML
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
-source "$SCRIPT_DIR/../models/configs.sh"
+CONFIG_FILE="$SCRIPT_DIR/../models/configs.yaml"
 
 # --- Download Loop ---
 echo "Starting downloads to: $TARGET_DIR"
@@ -34,15 +40,15 @@ if [ -n "$FILTER_STRING" ]; then
 fi
 echo "--------------------------------------------------------"
 
-for FILE_NAME in "${!MODEL_MAP[@]}"; do
-    
+MODEL_ENTRIES=$(yq -r '.models[] | [.filename, .repo] | @tsv' "$CONFIG_FILE")
+
+while IFS=$'\t' read -r FILE_NAME REPO_ID; do
+
     # If a filter string is provided, check if it exists in the filename
     if [ -n "$FILTER_STRING" ] &&
        [[ ! "$FILE_NAME" == *"$FILTER_STRING"* ]]; then
         continue # Skip this model if it doesn't match the filter
     fi
-
-    REPO_ID="${MODEL_MAP[$FILE_NAME]}"
     
     echo "Downloading: $FILE_NAME"
     echo "From Repo:   $REPO_ID"
@@ -60,6 +66,6 @@ for FILE_NAME in "${!MODEL_MAP[@]}"; do
         echo "❌ Failed to download $FILE_NAME."
     fi
     echo "--------------------------------------------------------"
-done
+done <<< "$MODEL_ENTRIES"
 
 echo "🎉 All requested download attempts completed."
