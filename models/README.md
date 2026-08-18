@@ -31,8 +31,8 @@ The provisioning script is configured to download the following models, which ha
 | Model | Parameters | Quantization | Max Safe Context |
 | :--- | :--- | :--- | :--- |
 | **Llama-3.2-1B-Instruct** | 1B | `Q4_K_M` | 64k |
-| **DeepSeek-R1-Distill-Qwen-1.5B** | 1.5B | `Q4_K_M` | 64k |
-| **Qwen2.5-1.5B-Instruct** | 1.5B | `Q4_K_M` | 64k |
+| **DeepSeek-R1-Distill-Qwen-1.5B** | 1.5B | `Q4_K_M` | 32k (native) |
+| **Qwen2.5-1.5B-Instruct** | 1.5B | `Q4_K_M` | 32k (native) |
 | **Qwen2.5-Coder-3B-Instruct** | 3B | `Q4_K_M` | 32k |
 | **Llama-3.2-3B-Instruct** | 3B | `Q4_K_M` | 32k |
 | **Granite-3.1-3B-A800M-Instruct** | 3B | `Q4_K_M` | 32k |
