@@ -1,0 +1,202 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${JOB_NAME}
+  namespace: ${NAMESPACE}
+  labels:
+    app.kubernetes.io/name: llama-server
+    app.kubernetes.io/instance: ${APP_NAME}
+    app.kubernetes.io/part-of: llm-ops
+    app.kubernetes.io/component: model-download
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: llama-server
+        app.kubernetes.io/instance: ${APP_NAME}
+        app.kubernetes.io/component: model-download
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: download
+          image: python:3.12-slim
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: HF_REPO
+              value: ${REPO_ID}
+            - name: HF_FILE
+              value: ${MODEL_NAME}
+            - name: HOME
+              value: /tmp
+            - name: PYTHONUSERBASE
+              value: /tmp
+            - name: HF_HOME
+              value: /models
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ${HF_SECRET}
+                  key: token
+                  optional: true
+          command:
+            - bash
+            - -c
+            - |
+              set -euo pipefail
+              export PATH="/tmp/bin:$PATH"
+              if [ -f "/models/${HF_FILE}" ]; then
+                echo "Already present: ${HF_FILE}"
+                exit 0
+              fi
+              pip install -q --user \
+                "huggingface_hub[cli]"
+              hf download "$HF_REPO" "$HF_FILE" \
+                --local-dir /models
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: models
+              mountPath: /models
+          resources:
+            requests:
+              cpu: "100m"
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: ${PVC_NAME}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${APP_NAME}
+  namespace: ${NAMESPACE}
+  labels:
+    app.kubernetes.io/name: llama-server
+    app.kubernetes.io/instance: ${APP_NAME}
+    app.kubernetes.io/part-of: llm-ops
+    app.kubernetes.io/component: inference
+    llm-ops/profile: ${PROFILE}
+    llm-ops/runtime: ${RUNTIME}
+spec:
+  replicas: ${REPLICAS}
+  strategy:
+    type: ${DEPLOY_STRATEGY}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: ${APP_NAME}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: llama-server
+        app.kubernetes.io/instance: ${APP_NAME}
+        app.kubernetes.io/part-of: llm-ops
+        app.kubernetes.io/component: inference
+        llm-ops/profile: ${PROFILE}
+        llm-ops/runtime: ${RUNTIME}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      tolerations:
+        ${GPU_TOLERATION_ITEMS}
+      containers:
+        - name: llama-server
+          image: ${LLAMA_IMAGE}
+          imagePullPolicy: IfNotPresent
+          args:
+            - -m
+            - /models/${MODEL_NAME}
+            - -c
+            - "${CONTEXT_WINDOW}"
+            - -np
+            - "${PARALLEL_REQUESTS}"
+            - --kv-unified
+            - --n-gpu-layers
+            - "${K8S_GPU_LAYERS}"
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8080"
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+            - name: shm
+              mountPath: /dev/shm
+          resources:
+            requests:
+              cpu: "${CONTAINER_CPUS}"
+              memory: ${MEM_GI}
+            limits:
+              cpu: "${CONTAINER_CPUS}"
+              memory: ${MEM_GI}${GPU_LIMIT_LINE}
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 20
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: ${PVC_NAME}
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: ${SHM_GI}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${APP_NAME}
+  namespace: ${NAMESPACE}
+  labels:
+    app.kubernetes.io/name: llama-server
+    app.kubernetes.io/instance: ${APP_NAME}
+    app.kubernetes.io/part-of: llm-ops
+    app.kubernetes.io/component: inference
+spec:
+  selector:
+    app.kubernetes.io/instance: ${APP_NAME}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

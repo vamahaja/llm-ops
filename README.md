@@ -1,5 +1,6 @@
 # llm-ops
-Infrastructure and automation scripts for local and Kubernetes Large Language Model deployment.
+Infrastructure and automation scripts for local, Kubernetes, and OpenShift Large Language Model deployment.
 
 - Podman (Vulkan, local): `deploy/podman`
-- Kubernetes (CPU): `deploy/k8s`
+- Kubernetes: `deploy/k8s`
+- OpenShift: `deploy/ocp`
