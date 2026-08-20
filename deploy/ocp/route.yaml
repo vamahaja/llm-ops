@@ -1,0 +1,19 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ${APP_NAME}
+  namespace: ${NAMESPACE}
+  labels:
+    app.kubernetes.io/name: llama-server
+    app.kubernetes.io/instance: ${APP_NAME}
+    app.kubernetes.io/part-of: llm-ops
+    app.kubernetes.io/component: inference
+spec:
+  host: "${ROUTE_HOST}"
+  to:
+    kind: Service
+    name: ${APP_NAME}
+    weight: 100
+  port:
+    targetPort: http
+  wildcardPolicy: None
